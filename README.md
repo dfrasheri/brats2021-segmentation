@@ -267,6 +267,10 @@ scripts/
 
 ## Using the trained model
 
+Checkpoints are **not** committed (73 MB for the three). Run `scripts/run_all.sh` to regenerate
+them — 25 minutes on a mid-range GPU — or train just the one you need with
+`python scripts/train.py --config nnunet_style`.
+
 ```python
 import torch
 from src.config import NUM_CLASSES, get_device
