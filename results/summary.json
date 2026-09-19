@@ -1,0 +1,155 @@
+{
+  "baseline_unet": {
+    "description": "Plain 3D U-Net, min-max scaling, cross-entropy only, no augmentation.",
+    "parameters": 5647732,
+    "n_test_patients": 45,
+    "inference_seconds_mean": 0.5280397521124945,
+    "inference_seconds_std": 0.07487607940850878,
+    "metrics": {
+      "WT": {
+        "dice_mean": 0.8900794799823591,
+        "dice_std": 0.0927134513328695,
+        "dice_n": 45,
+        "hd95_mean": 12.547917275910413,
+        "hd95_std": 24.073466816277445,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.9270998630485262,
+        "sensitivity_std": 0.06952259434901244,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9972315804880698,
+        "specificity_std": 0.0023037627493828245,
+        "specificity_n": 45
+      },
+      "TC": {
+        "dice_mean": 0.7647579655206035,
+        "dice_std": 0.2277193198566955,
+        "dice_n": 45,
+        "hd95_mean": 19.459896581270193,
+        "hd95_std": 29.57539081350531,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.8174077670703137,
+        "sensitivity_std": 0.18580137347758635,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9981381005538981,
+        "specificity_std": 0.002966255564458453,
+        "specificity_n": 45
+      },
+      "ET": {
+        "dice_mean": 0.7549842808129802,
+        "dice_std": 0.17013471893720886,
+        "dice_n": 45,
+        "hd95_mean": 13.947234732915659,
+        "hd95_std": 27.070916261023882,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.80267212717258,
+        "sensitivity_std": 0.18093621901748316,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9985150059533244,
+        "specificity_std": 0.002014561847087323,
+        "specificity_n": 45
+      }
+    }
+  },
+  "nnunet_style": {
+    "description": "nnU-Net design principles: per-modality z-score, Dice+CE, deep supervision, augmentation.",
+    "parameters": 5648124,
+    "n_test_patients": 45,
+    "inference_seconds_mean": 0.5194543043772379,
+    "inference_seconds_std": 0.054580569237528305,
+    "metrics": {
+      "WT": {
+        "dice_mean": 0.893120209382921,
+        "dice_std": 0.10545466720864956,
+        "dice_n": 45,
+        "hd95_mean": 10.6804088059812,
+        "hd95_std": 23.24038345610493,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.9317038324790569,
+        "sensitivity_std": 0.07321687608410017,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9970991090893426,
+        "specificity_std": 0.004100871451145321,
+        "specificity_n": 45
+      },
+      "TC": {
+        "dice_mean": 0.8206940694764286,
+        "dice_std": 0.25055506813754014,
+        "dice_n": 45,
+        "hd95_mean": 13.53139319512003,
+        "hd95_std": 27.19162488434623,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.8854591421705637,
+        "sensitivity_std": 0.1914563423336528,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.998554263567697,
+        "specificity_std": 0.0036436569396735468,
+        "specificity_n": 45
+      },
+      "ET": {
+        "dice_mean": 0.7933774503981401,
+        "dice_std": 0.2114846821062863,
+        "dice_n": 45,
+        "hd95_mean": 10.311439644264764,
+        "hd95_std": 23.604393705618985,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.8461893653685207,
+        "sensitivity_std": 0.18062401098986375,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9989144047413606,
+        "specificity_std": 0.001912736429260794,
+        "specificity_n": 45
+      }
+    }
+  },
+  "vnet": {
+    "description": "V-Net style residual encoder-decoder, same preprocessing as nnunet_style.",
+    "parameters": 7752948,
+    "n_test_patients": 45,
+    "inference_seconds_mean": 0.546793794631958,
+    "inference_seconds_std": 0.06281432513599092,
+    "metrics": {
+      "WT": {
+        "dice_mean": 0.8901175672757311,
+        "dice_std": 0.09529578811987381,
+        "dice_n": 45,
+        "hd95_mean": 12.603769152547647,
+        "hd95_std": 21.998647925030053,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.932474372137919,
+        "sensitivity_std": 0.07462096242426565,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9972146577296869,
+        "specificity_std": 0.0024632333237923744,
+        "specificity_n": 45
+      },
+      "TC": {
+        "dice_mean": 0.8192285008609348,
+        "dice_std": 0.22469093046113817,
+        "dice_n": 45,
+        "hd95_mean": 13.64814574020645,
+        "hd95_std": 24.52935321599761,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.8777672012968829,
+        "sensitivity_std": 0.14941538922427716,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9984824618231788,
+        "specificity_std": 0.0031627852432112745,
+        "specificity_n": 45
+      },
+      "ET": {
+        "dice_mean": 0.8089700401467081,
+        "dice_std": 0.18318417759268785,
+        "dice_n": 45,
+        "hd95_mean": 9.654792513630111,
+        "hd95_std": 21.32688520477375,
+        "hd95_n": 45,
+        "sensitivity_mean": 0.856788790341473,
+        "sensitivity_std": 0.15368442498171064,
+        "sensitivity_n": 45,
+        "specificity_mean": 0.9988249762538595,
+        "specificity_std": 0.0021648434897183523,
+        "specificity_n": 45
+      }
+    }
+  }
+}

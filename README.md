@@ -8,7 +8,7 @@ Three configurations are trained and compared under an identical budget, so the 
 between methods rather than between amounts of compute.
 
 > **Compute budget, stated up front.** Everything here was trained on a single RTX 4070 Laptop
-> (8.6 GB VRAM) in about **30 minutes of total GPU time**, on a 300-patient subset. Published BraTS
+> (8.6 GB VRAM) in about **25 minutes of total GPU time**, on a 300-patient subset. Published BraTS
 > results come from multi-day runs on the full 1,251 patients, and the numbers below are
 > correspondingly lower. Every figure in this repository was measured by the scripts in it —
 > nothing is copied from a paper or estimated.
@@ -17,7 +17,86 @@ between methods rather than between amounts of compute.
 
 ## Results
 
-<!-- RESULTS_TABLE -->
+Held-out test set: **45 patients**, never seen during training or model selection. Dice is mean ± standard deviation **across patients** — it describes case-to-case variability, not a seed-to-seed error bar (one seed per config).
+
+| Model | Params | Dice WT | Dice TC | Dice ET | HD95 WT (vox) | Inference |
+|---|---|---|---|---|---|---|
+| nnU-Net-style U-Net | 5.6M | **0.893 ± 0.105** | **0.821 ± 0.251** | 0.793 ± 0.211 | **10.7** | **0.52s** |
+| V-Net | 7.8M | 0.890 ± 0.095 | 0.819 ± 0.225 | **0.809 ± 0.183** | 12.6 | 0.55s |
+| Baseline U-Net | 5.6M | 0.890 ± 0.093 | 0.765 ± 0.228 | 0.755 ± 0.170 | 12.5 | 0.53s |
+
+### Which differences are real
+
+Per-patient Dice varies far more (σ ≈ 0.10–0.25) than the gap between models, so eyeballing the means above is not enough. Every config is evaluated on the *same* patients, so the comparison is **paired** — which removes between-patient variance and asks the question that matters: on a given patient, is one model better? Wilcoxon signed-rank is reported alongside the t-test because per-patient Dice is left-skewed and bounded at 1.
+
+| Comparison | Region | Δ Dice | 95% CI | Wilcoxon p | Better on |
+|---|---|---|---|---|---|
+| nnU-Net-style U-Net vs Baseline U-Net | WT | +0.003 | [-0.007, +0.013] | **0.0098** | 32/45 |
+|  | TC | +0.056 | [+0.020, +0.092] | **0.0000** | 39/45 |
+|  | ET | +0.038 | [+0.004, +0.073] | **0.0000** | 40/45 |
+| V-Net vs Baseline U-Net | WT | +0.000 | [-0.009, +0.009] | 0.561 | 27/45 |
+|  | TC | +0.054 | [+0.028, +0.081] | **0.0000** | 38/45 |
+|  | ET | +0.054 | [+0.039, +0.069] | **0.0000** | 42/45 |
+
+**What this actually says.** The configuration bundle (per-modality z-scoring, Dice+CE, augmentation, deep supervision) buys **nothing measurable on whole tumour** — all three models sit within 0.003 of each other there — but a real **+0.04 to +0.05 on tumour core and enhancing tumour**. That is the sensible direction: whole tumour is large and high-contrast on FLAIR, so even a weak configuration finds it, and the harder small structures are where loss function and normalisation earn their keep. Reporting only the headline WT number would have hidden the entire effect.
+
+The two strong configs are statistically indistinguishable from each other on this test set; with one seed apiece, the honest reading is a tie.
+
+### Training cost
+
+| Config | Iterations | Wall clock | Best val Dice |
+|---|---|---|---|
+| nnU-Net-style U-Net | 2000 | 8.3 min | 0.857 |
+| V-Net | 2000 | 9.0 min | 0.853 |
+| Baseline U-Net | 2000 | 7.9 min | 0.830 |
+
+**Total training time: 25 minutes** on one RTX 4070 Laptop.
+
+### Figures
+
+**Per-patient Dice distribution**
+
+![Per-patient Dice distribution](results/figures/dice_distribution.png)
+
+**Baseline U-Net: worst / median / best test cases**
+
+![Baseline U-Net: worst / median / best test cases](results/figures/qualitative_baseline_unet.png)
+
+**nnU-Net-style: worst / median / best test cases**
+
+![nnU-Net-style: worst / median / best test cases](results/figures/qualitative_nnunet_style.png)
+
+**V-Net: worst / median / best test cases**
+
+![V-Net: worst / median / best test cases](results/figures/qualitative_vnet.png)
+
+**Training loss and validation Dice**
+
+![Training loss and validation Dice](results/figures/training_curves.png)
+
+---
+
+## Observed failure modes
+
+Taken from the worst test cases in the figures above, not from speculation.
+
+**Contralateral false positives.** The clearest failure (`BraTS2021_01482`, WT Dice 0.452) is not a
+missed tumour — the real lesion is segmented reasonably well. The model additionally invented a
+second lesion in the opposite hemisphere, where the ground truth has nothing. FLAIR hyperintensity
+from non-tumour causes (small-vessel disease, gliosis, normal periventricular signal) looks similar
+to oedema locally, and a `128³` patch does not always contain enough context to tell them apart.
+A whole-brain consistency constraint, or simply more training data, would be the place to attack
+this.
+
+**Enhancing tumour is bimodal, not uniformly mediocre.** The per-patient distribution shows the
+model either finds the enhancing core or largely misses it — the mean of ~0.79 is an average over
+two modes, not a typical case. This is why the standard deviation on ET (0.21) is roughly double
+that on whole tumour (0.10), and it is the strongest argument for reporting the distribution rather
+than the mean alone.
+
+**Boundary precision lags overlap.** HD95 of 10–13 voxels is high relative to published BraTS
+results (~5–8). Dice rewards getting the bulk of a region right; HD95 punishes the worst boundary
+excursion. The gap between the two is where the short training budget shows most clearly.
 
 ---
 
@@ -126,13 +205,14 @@ jupyter notebook brats2021_download_and_check.ipynb
 # 3. Preprocessing cache (~4 min, ~10 GB)
 python scripts/build_cache.py --n 300
 
-# 4. Train all three configurations (~30 min total on an RTX 4070 Laptop)
+# 4. Train all three configurations (~25 min total on an RTX 4070 Laptop)
 ITERS=2000 ./scripts/run_all.sh
 
 # 5. Evaluate on held-out patients and render figures
 python scripts/evaluate.py
+python scripts/compare_configs.py   # paired significance tests between configs
 python scripts/make_figures.py
-python scripts/make_table.py     # regenerates the results table above
+python scripts/update_readme.py     # regenerates the Results section above
 ```
 
 Individual runs:
@@ -177,8 +257,9 @@ scripts/
   build_cache.py                     .nii.gz -> cropped float16 .npy
   train.py                           Training loop
   evaluate.py                        Test-set evaluation
+  compare_configs.py                 Paired t-test / Wilcoxon between configurations
   make_figures.py                    Figures
-  make_table.py                      Results table for this README
+  update_readme.py                   Regenerates the Results section from measured output
   run_all.sh                         Trains all three configurations
 ```
 

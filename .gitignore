@@ -6,7 +6,6 @@ datasets/
 
 # Checkpoints and logs
 checkpoints/
-logs/
 *.pt
 *.pth
 runs/
@@ -63,7 +62,6 @@ Thumbs.db
 *.temp
 .cache/
 cache/
-results/
 
 # Local tooling
 .mcp.json

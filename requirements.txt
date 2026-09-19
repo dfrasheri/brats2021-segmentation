@@ -1,30 +1,23 @@
-# BraTS 2021 Segmentation
+# Pinned to what this project actually imports. Versions are the ones the
+# reported results were produced with.
 
-# Core ML
-torch>=2.0.0
-torchvision>=0.15.0
-torchaudio>=0.15.0
+# Deep learning. The +cu121 build is what was used; install the CUDA build that
+# matches your driver from https://pytorch.org for GPU training.
+torch==2.5.1
 
-# Medical imaging
-nibabel>=5.0.0
-scikit-image>=0.20.0
+# Medical imaging I/O
+nibabel==5.3.3
+
+# Numerics. scipy provides binary_erosion (surface extraction) and cKDTree (HD95).
+numpy==2.3.5
 scipy>=1.10.0
-
-# Data & compute
-numpy>=1.23.0
 pandas>=1.5.0
-scikit-learn>=1.2.0
-tqdm>=4.64.0
 
-# Notebook & visualization
+# Data download (notebook only)
+kaggle>=1.7.0
+
+# Notebooks and figures
+matplotlib==3.10.8
 jupyter>=1.0.0
-matplotlib>=3.6.0
-seaborn>=0.12.0
 ipywidgets>=8.0.0
-
-# Reproducibility
-pyyaml>=6.0
-
-# Optional: for advanced training
-wandb>=0.13.0
-tensorboard>=2.11.0
+tqdm==4.67.1
