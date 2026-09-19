@@ -1,0 +1,30 @@
+# BraTS 2021 Segmentation
+
+# Core ML
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=0.15.0
+
+# Medical imaging
+nibabel>=5.0.0
+scikit-image>=0.20.0
+scipy>=1.10.0
+
+# Data & compute
+numpy>=1.23.0
+pandas>=1.5.0
+scikit-learn>=1.2.0
+tqdm>=4.64.0
+
+# Notebook & visualization
+jupyter>=1.0.0
+matplotlib>=3.6.0
+seaborn>=0.12.0
+ipywidgets>=8.0.0
+
+# Reproducibility
+pyyaml>=6.0
+
+# Optional: for advanced training
+wandb>=0.13.0
+tensorboard>=2.11.0
