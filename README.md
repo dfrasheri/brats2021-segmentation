@@ -1,5 +1,7 @@
 # BraTS 2021 — Brain Tumour Segmentation
 
+[![tests](https://github.com/dfrasheri/brats2021-segmentation/actions/workflows/tests.yml/badge.svg)](https://github.com/dfrasheri/brats2021-segmentation/actions/workflows/tests.yml)
+
 3D segmentation of brain tumours in multi-modal MRI, built end to end: data acquisition and
 validation, a preprocessing cache, patch-based training, sliding-window inference, and per-region
 evaluation against the metrics the BraTS challenge actually scores.
@@ -191,6 +193,72 @@ use its self-configuration. Calling it "nnU-Net" would overstate what was done.
 
 ---
 
+## Notebooks
+
+Three notebooks, each a sequence of numbered steps. They are readable in order and none of
+them contains logic the pipeline depends on — they import the same `src/` modules that
+`scripts/` does.
+
+### [`01_exploratory_analysis.ipynb`](notebooks/01_exploratory_analysis.ipynb)
+
+Establishes the facts that justify every later design decision.
+
+| Step | Measures | Decides |
+|---|---|---|
+| 1 | Cache contents and the patient-level split | That train/val/test share no patient |
+| 2 | Class balance | Accuracy is unusable → Dice+CE, tumour-biased sampling |
+| 3 | Tumour volume spread | Report distributions, not point estimates |
+| 4 | Intensity per modality | Normalisation must be per-modality |
+| 5 | One patient, all four modalities | Labels align with anatomy; T1ce carries the enhancing signal |
+| 6 | — | Summarises which choice follows from which measurement |
+
+### [`02_pipeline_walkthrough.ipynb`](notebooks/02_pipeline_walkthrough.ipynb)
+
+Runs a single held-out patient through all seven stages, so the mechanics are visible rather
+than buried in `scripts/train.py`.
+
+| Step | Stage |
+|---|---|
+| 1 | Load a cached patient |
+| 2 | Normalise intensities |
+| 3 | Sample a training patch (and show the foreground bias working) |
+| 4 | Build the network |
+| 5 | One forward pass, including the deep-supervision outputs |
+| 6 | Sliding-window inference over the full volume |
+| 7 | Score it per region |
+
+### [`03_results.ipynb`](notebooks/03_results.ipynb)
+
+Reads the artefacts written by `evaluate.py` and `compare_configs.py`. Trains nothing,
+re-runs no inference — so its numbers match the README by construction.
+
+| Step | Question |
+|---|---|
+| 1 | What was measured, on how many patients |
+| 2 | How the three configurations compare |
+| 3 | Which differences survive a paired significance test |
+| 4 | How much performance varies between patients |
+| 5 | Did training converge, or was it still improving |
+| 6 | Where the best model fails, and why |
+
+---
+
+## Tests
+
+```bash
+python -m pytest
+```
+
+49 tests over the metrics and pipeline. The metrics tests matter most: a wrong metric does
+not crash, it quietly reports a plausible-looking number, and every result in this README
+depends on those functions being correct. They cover the two bugs that were actually found
+and fixed during development — a label-convention mismatch between prediction and target,
+and an ensemble that voted globally instead of per voxel.
+
+CI runs the suite on every push against CPU-only PyTorch.
+
+---
+
 ## Reproducing this
 
 ```bash
@@ -243,8 +311,9 @@ per configuration, and claiming otherwise would misrepresent the experiment.
 ```
 brats2021_download_and_check.ipynb   Data acquisition and integrity checking (1,251 patients)
 notebooks/
-  01_eda.ipynb                       Class imbalance, tumour volume distribution, modalities
-  02_results.ipynb                   Renders measured results; computes nothing new
+  01_exploratory_analysis.ipynb      What the data is, and which design choices it forces
+  02_pipeline_walkthrough.ipynb      One patient through all seven pipeline stages
+  03_results.ipynb                   Measured results and significance; computes nothing new
 src/
   config.py                          All hyperparameters and the three configuration definitions
   data.py                            Patient-level split, patch sampling from the cache
@@ -261,7 +330,13 @@ scripts/
   make_figures.py                    Figures
   update_readme.py                   Regenerates the Results section from measured output
   run_all.sh                         Trains all three configurations
+tests/
+  test_metrics.py                    Dice, HD95, region definitions, label conventions
+  test_pipeline.py                   Normalisation, splitting, models, ensembling, inference
 ```
+
+All notebooks are committed **with their outputs**, so they can be read on GitHub without
+running anything.
 
 ---
 
