@@ -67,3 +67,6 @@ cache/
 .mcp.json
 .claude/
 .idea/
+
+# Local Claude Code instructions (not part of the project)
+CLAUDE.local.md
