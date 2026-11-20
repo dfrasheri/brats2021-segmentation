@@ -1,0 +1,16 @@
+.git
+.venv
+.idea
+.claude
+.pytest_cache
+cache
+datasets
+logs
+results
+notebooks
+mlruns
+nnunet
+submissions
+*.ipynb
+**/__pycache__
+checkpoints/*_f*_s*_best.pt

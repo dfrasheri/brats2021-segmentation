@@ -70,3 +70,8 @@ cache/
 
 # Local Claude Code instructions (not part of the project)
 CLAUDE.local.md
+
+# MLflow runs, submissions, nnU-Net working data
+mlruns/
+submissions/
+nnunet/predictions_brats/

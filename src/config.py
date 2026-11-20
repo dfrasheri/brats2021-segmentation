@@ -19,7 +19,13 @@ NUM_CLASSES = 4          # 0 background, 1 necrotic, 2 edema, 3 enhancing (BraTS
 # Subset size. Patch-based training is iteration-bound, not epoch-bound, so a
 # larger cache would not improve a short run - it would only cost disk and time.
 SUBSET_SIZE = 300
+FULL_DATASET_SIZE = 1251       # all BraTS 2021 Task 1 training patients
 TRAIN_RATIO, VAL_RATIO, TEST_RATIO = 0.70, 0.15, 0.15
+
+# ---- Cross-validation study (full-scale protocol) ----------------------
+N_FOLDS = 5
+STUDY_SEEDS = [42, 43, 44]     # three seeds -> genuine seed-to-seed error bars
+CV_VAL_RATIO = 0.10            # of the non-test folds, held out for model selection
 
 # ---- Training ----------------------------------------------------------
 SEED = 42
@@ -72,5 +78,25 @@ CONFIGS = {
         "deep_supervision": False,
         "base_channels": 16,
         "description": "V-Net style residual encoder-decoder, same preprocessing as nnunet_style.",
+    },
+    # MONAI reference architectures, trained under the identical budget and
+    # preprocessing as nnunet_style so the comparison is architecture-only.
+    "segresnet": {
+        "model": "segresnet",
+        "normalization": "zscore",
+        "loss": "dice_ce",
+        "augment": True,
+        "deep_supervision": False,
+        "base_channels": 16,
+        "description": "MONAI SegResNet (Myronenko 2018, BraTS 2018 winner), same preprocessing as nnunet_style.",
+    },
+    "swin_unetr": {
+        "model": "swin_unetr",
+        "normalization": "zscore",
+        "loss": "dice_ce",
+        "augment": True,
+        "deep_supervision": False,
+        "base_channels": 24,   # SwinUNETR feature_size; must be divisible by 12
+        "description": "MONAI Swin-UNETR (transformer encoder, CNN decoder), same preprocessing as nnunet_style.",
     },
 }

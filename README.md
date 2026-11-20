@@ -249,7 +249,7 @@ re-runs no inference — so its numbers match the README by construction.
 python -m pytest
 ```
 
-49 tests over the metrics and pipeline. The metrics tests matter most: a wrong metric does
+79 tests over the metrics, pipeline, post-processing, NIfTI I/O and API. The metrics tests matter most: a wrong metric does
 not crash, it quietly reports a plausible-looking number, and every result in this README
 depends on those functions being correct. They cover the two bugs that were actually found
 and fixed during development — a label-convention mismatch between prediction and target,
@@ -321,18 +321,37 @@ src/
   models.py                          3D U-Net (optional deep supervision), V-Net
   losses.py                          Dice+CE, deep-supervision wrapper
   metrics.py                         Region definitions, Dice, HD95, sensitivity/specificity
-  inference.py                       Sliding-window inference, per-voxel ensembling
+  inference.py                       Sliding-window inference (labels or probabilities), voting
+  postprocess.py                     Mirror TTA, soft-vote ensembling, ET suppression, island removal
+  uncertainty.py                     Entropy, mutual information, missing-sequence simulation
+  nifti_io.py                        Raw NIfTI in/out in original space; BraTS 2021 and 2023 naming
+  predictor.py                       One end-to-end predictor shared by export, API and MONAILabel
+  checkpoint.py                      Checkpoint loading and discovery
+  tracking.py                        Optional MLflow tracking
 scripts/
   build_cache.py                     .nii.gz -> cropped float16 .npy
-  train.py                           Training loop
+  train.py                           Training loop (--fold for CV, --mlflow)
   evaluate.py                        Test-set evaluation
   compare_configs.py                 Paired t-test / Wilcoxon between configurations
   make_figures.py                    Figures
   update_readme.py                   Regenerates the Results section from measured output
   run_all.sh                         Trains all three configurations
+  run_cv_study.sh                    Configs x 5 folds x 3 seeds, resumable
+  evaluate_cv.py                     Out-of-fold scores with seed and fold error bars
+  evaluate_postproc.py               TTA / ensemble / ET-suppression ablation
+  evaluate_robustness.py             Missing sequences, external data, uncertainty
+  predict_folder.py                  Validation-server submission masks
+  evaluate_predictions.py            Score external predictions (e.g. nnU-Net v2) with our metrics
+  finetune_from_corrections.py       Fine-tune on clinician-corrected masks
+nnunet/                              Official nnU-Net v2 on the same folds
+serve/app.py                         FastAPI inference service
+deploy/                              Cloud Run deploy, Cloud Build, GCP spot training VM
+monailabel_app/                      3D Slicer / MONAILabel integration
+Dockerfile, MODEL_CARD.md            Inference image, model card
 tests/
   test_metrics.py                    Dice, HD95, region definitions, label conventions
   test_pipeline.py                   Normalisation, splitting, models, ensembling, inference
+  test_extensions.py                 CV folds, TTA, post-processing, uncertainty, NIfTI, API
 ```
 
 All notebooks are committed **with their outputs**, so they can be read on GitHub without
@@ -389,13 +408,29 @@ These are the honest boundaries of what was done here.
   excluded from the HD95 average, and the count of contributing patients is recorded in
   `results/summary.json`.
 
-## Possible next steps
+## From experiment to study: what is built, what has been run
 
-- Train on all 1,251 patients with a longer schedule
-- Separate the bundled ablation into individual factors
-- Multiple seeds for genuine error bars
-- Test-time augmentation, typically worth a few points of Dice
-- 5-fold cross-validation instead of a single held-out split
+The code for each step below is written and covered by tests. **None of the GPU-heavy steps has been run
+yet, so no result here comes from them.** The Results section above still describes only the original
+300-patient, single-seed run. Each row gives the command that produces the missing numbers.
+
+| Step | Built | Run? | Command |
+|---|---|---|---|
+| Full dataset, 5-fold CV × 3 seeds | `kfold_split`, `--fold`, resumable study runner, seed/fold/patient error bars | No (~56 GPU-h for 5 configs) | `python scripts/build_cache.py --n 1251 && ./scripts/run_cv_study.sh && python scripts/evaluate_cv.py` |
+| Official nnU-Net v2 reference | Export, **our exact folds** written to `splits_final.json`, label mapping back, scoring with our metrics | No (~12–24 GPU-h per fold) | `./nnunet/run_nnunet.sh` |
+| SegResNet and Swin-UNETR (MONAI) | Two configs with identical preprocessing and budget | No | `CONFIGS="segresnet swin_unetr" ./scripts/run_cv_study.sh` |
+| Official validation server | Raw NIfTI → original 240×240×155 space and affine, label 4 restored | No (needs your Synapse account) | `python scripts/predict_folder.py --input <val dir> --output submissions/val --checkpoints ... --tta` |
+| TTA, ensembling, ET suppression | 8-way mirror TTA, soft voting, ET threshold tuned on **validation only**, paired Wilcoxon | No (needs the cache rebuilt) | `python scripts/evaluate_postproc.py` |
+| Robustness and uncertainty | Missing-sequence ablation (zero/mean fill), BraTS 2023 naming, entropy and mutual information, uncertainty-vs-Dice correlation | No | `python scripts/evaluate_robustness.py --checkpoint ... [--external-dir ...]` |
+| MLOps | MLflow (`--mlflow`), FastAPI service, Dockerfile, Cloud Run deploy (auth required), CI image smoke test, [model card](MODEL_CARD.md) | Locally only; not deployed | `docker build -t brats-seg . && PROJECT=... ./deploy/cloudrun.sh` |
+| Clinician in the loop | MONAILabel app for 3D Slicer; versioned fine-tuning on corrected masks with replay | No | see [`monailabel_app/main.py`](monailabel_app/main.py) |
+| Paper | Outline, with every number tied to a result file | Writing waits on results | [`docs/paper_outline.md`](docs/paper_outline.md) |
+
+GPU on GCP: `deploy/gcp_train_vm.sh` starts a spot L4/A100 VM. The VM runs one slice of the study, syncs
+checkpoints to a bucket after each run, and shuts itself down. If it is pre-empted, re-creating it resumes
+the study.
+
+Still open: separating the bundled `nnunet_style` ablation into its individual factors.
 
 ---
 

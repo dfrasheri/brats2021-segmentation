@@ -1,0 +1,8 @@
+# Inference service only (torch is installed separately in the Dockerfile so the
+# CPU or CUDA wheel can be chosen at build time).
+numpy==2.3.5
+scipy>=1.10.0
+nibabel==5.3.3
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart>=0.0.9

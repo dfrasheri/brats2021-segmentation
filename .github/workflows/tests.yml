@@ -22,8 +22,36 @@ jobs:
         # wheels are ~2.5 GB, which would dominate CI time for no benefit.
         run: |
           python -m pip install --upgrade pip
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install numpy scipy pandas pytest
+          pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy scipy pandas pytest nibabel monai==1.5.1 einops \
+                      fastapi httpx uvicorn python-multipart
 
       - name: Run tests
         run: python -m pytest -q
+
+  docker:
+    # Builds the inference image with a throwaway checkpoint, starts it, and
+    # checks /health - catches a broken Dockerfile or import before deploy.
+    runs-on: ubuntu-latest
+    needs: pytest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create an untrained placeholder checkpoint
+        run: |
+          pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          mkdir -p checkpoints
+          python -c "
+          import torch, sys; sys.path.insert(0, '.')
+          from src.config import CONFIGS; from src.models import create_model
+          m = create_model('unet', deep_supervision=True)
+          torch.save({'model': m.state_dict(), 'settings': CONFIGS['nnunet_style'], 'config': 'nnunet_style'},
+                     'checkpoints/nnunet_style_best.pt')"
+      - name: Build and smoke-test the image
+        run: |
+          docker build -t brats-seg:ci .
+          docker run -d -p 8080:8080 --name api brats-seg:ci
+          for i in $(seq 1 30); do curl -sf localhost:8080/health && break; sleep 2; done
+          curl -sf localhost:8080/model

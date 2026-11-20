@@ -31,11 +31,13 @@ def _starts(size, patch, step):
 
 
 @torch.no_grad()
-def sliding_window_inference(model, image, patch_size=PATCH_SIZE, overlap=SW_OVERLAP,
-                             num_classes=NUM_CLASSES, device=None, amp=True):
-    """Predict a full [C,H,W,D] volume with a model trained on patches.
+def sliding_window_probs(model, image, patch_size=PATCH_SIZE, overlap=SW_OVERLAP,
+                         num_classes=NUM_CLASSES, device=None, amp=True):
+    """Softmax probabilities [K,H,W,D] for a full [C,H,W,D] volume.
 
-    Returns an integer label map of shape [H,W,D].
+    Probabilities rather than labels are what test-time augmentation, model
+    ensembling and uncertainty estimation all need: an argmax throws away how
+    confident each prediction was.
     """
     model.eval()
     device = device or next(model.parameters()).device
@@ -69,8 +71,16 @@ def sliding_window_inference(model, image, patch_size=PATCH_SIZE, overlap=SW_OVE
                 counts[:, z:z + ph, y:y + pw, x:x + pd] += weight
 
     logits /= counts.clamp(min=1e-6)
-    pred = logits.argmax(0).cpu().numpy().astype(np.uint8)
-    return pred[:H, :W, :D]
+    probs = torch.softmax(logits, dim=0).cpu().numpy().astype(np.float32)
+    return probs[:, :H, :W, :D]
+
+
+def sliding_window_inference(model, image, **kwargs):
+    """Predict a full [C,H,W,D] volume with a model trained on patches.
+
+    Returns an integer label map of shape [H,W,D].
+    """
+    return sliding_window_probs(model, image, **kwargs).argmax(0).astype(np.uint8)
 
 
 def predict_case(model, img, normalization="zscore", **kwargs):

@@ -42,6 +42,27 @@ def split_cases(case_ids=None, seed=SEED):
     return ids[:n_train], ids[n_train:n_train + n_val], ids[n_train + n_val:]
 
 
+def kfold_split(case_ids=None, fold=0, n_folds=5, seed=SEED, val_ratio=0.10):
+    """Patient-level k-fold split: (train, val, test) for one fold.
+
+    Every patient lands in exactly one test fold across the k folds, so the
+    pooled out-of-fold predictions cover the whole dataset once. A validation
+    slice is carved from the remaining folds for checkpoint selection, so the
+    test fold is never used to choose a model.
+    """
+    if not 0 <= fold < n_folds:
+        raise ValueError(f"fold must be in [0, {n_folds}), got {fold}")
+    ids = sorted(case_ids if case_ids is not None else cached_case_ids())
+    rng = np.random.RandomState(seed)
+    ids = [ids[i] for i in rng.permutation(len(ids))]
+
+    folds = np.array_split(np.arange(len(ids)), n_folds)
+    test = [ids[i] for i in folds[fold]]
+    rest = [ids[i] for k, f in enumerate(folds) if k != fold for i in f]
+    n_val = max(1, int(round(len(rest) * val_ratio)))
+    return rest[n_val:], rest[:n_val], test
+
+
 def load_case(case_id):
     """Return (img float32 [4,H,W,D], seg uint8 [H,W,D]) straight from cache."""
     img = np.load(CACHE_DIR / f"{case_id}_img.npy").astype(np.float32)

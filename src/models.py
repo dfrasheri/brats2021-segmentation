@@ -168,6 +168,32 @@ class VNet(nn.Module):
         return self.final(x)
 
 
+MONAI_MODELS = ("segresnet", "swin_unetr")
+
+
+def _create_monai_model(name, in_channels, num_classes, base_channels):
+    """MONAI reference architectures. Imported lazily so the core pipeline and
+    its tests do not require MONAI."""
+    try:
+        from monai.networks.nets import SegResNet, SwinUNETR
+    except ImportError as e:  # pragma: no cover - exercised only without MONAI
+        raise ImportError(f"model '{name}' needs MONAI: pip install monai") from e
+
+    if name == "segresnet":
+        return SegResNet(spatial_dims=3, in_channels=in_channels, out_channels=num_classes,
+                         init_filters=base_channels, blocks_down=(1, 2, 2, 4),
+                         blocks_up=(1, 1, 1), dropout_prob=0.2)
+    # SwinUNETR: feature_size must be divisible by 12; inputs divisible by 32.
+    # `img_size` was removed from the constructor in MONAI 1.5, so pass it only
+    # to versions that still require it.
+    import inspect
+    kwargs = dict(in_channels=in_channels, out_channels=num_classes,
+                  feature_size=base_channels, use_checkpoint=True, spatial_dims=3)
+    if "img_size" in inspect.signature(SwinUNETR.__init__).parameters:
+        kwargs["img_size"] = (128, 128, 128)
+    return SwinUNETR(**kwargs)
+
+
 def create_model(name, in_channels=4, num_classes=4, base_channels=16,
                  deep_supervision=False, device="cpu"):
     if name == "unet":
@@ -175,6 +201,8 @@ def create_model(name, in_channels=4, num_classes=4, base_channels=16,
                        base_channels=base_channels, deep_supervision=deep_supervision)
     elif name == "vnet":
         model = VNet(in_channels, num_classes, base_channels=base_channels, depth=4)
+    elif name in MONAI_MODELS:
+        model = _create_monai_model(name, in_channels, num_classes, base_channels)
     else:
         raise ValueError("unknown model: " + str(name))
     return model.to(device)

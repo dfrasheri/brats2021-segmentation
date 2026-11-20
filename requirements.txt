@@ -21,3 +21,10 @@ matplotlib==3.10.8
 jupyter>=1.0.0
 ipywidgets>=8.0.0
 tqdm==4.67.1
+
+# Full-scale study (MONAI reference models, experiment tracking)
+monai==1.5.1
+einops>=0.8          # required by MONAI's Swin-UNETR
+mlflow>=2.12
+
+# Inference service: see requirements-serve.txt. MONAILabel: pip install monailabel

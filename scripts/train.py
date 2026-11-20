@@ -17,9 +17,10 @@ from torch.utils.data import DataLoader
 from src.config import (
     CONFIGS, CHECKPOINT_DIR, LOG_DIR, PATCH_SIZE, BATCH_SIZE, LEARNING_RATE,
     WEIGHT_DECAY, GRADIENT_CLIP, WARMUP_ITERS, VAL_EVERY, VAL_PATIENTS,
-    NUM_CLASSES, SEED, get_device,
+    NUM_CLASSES, SEED, N_FOLDS, CV_VAL_RATIO, get_device,
 )
-from src.data import PatchDataset, split_cases, load_case
+from src.data import PatchDataset, split_cases, kfold_split, load_case
+from src.tracking import start_run
 from src.losses import build_loss
 from src.models import create_model, count_parameters
 from src.metrics import evaluate_segmentation
@@ -69,7 +70,13 @@ def main():
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--seed", type=int, default=SEED)
     ap.add_argument("--tag", default="")
+    ap.add_argument("--fold", type=int, default=None,
+                    help="k-fold CV fold index; omit for the original fixed 70/15/15 split")
+    ap.add_argument("--n-folds", type=int, default=N_FOLDS)
+    ap.add_argument("--mlflow", action="store_true", help="log the run to MLflow")
     args = ap.parse_args()
+    if args.fold is not None and not args.tag:
+        args.tag = f"_f{args.fold}_s{args.seed}"
 
     cfg = CONFIGS[args.config]
     set_seed(args.seed)
@@ -79,7 +86,13 @@ def main():
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    train_ids, val_ids, test_ids = split_cases()
+    # The split always uses the fixed SEED, never --seed: every training seed
+    # must see identical folds, or seed variance and split variance get mixed.
+    if args.fold is None:
+        train_ids, val_ids, test_ids = split_cases()
+    else:
+        train_ids, val_ids, test_ids = kfold_split(fold=args.fold, n_folds=args.n_folds,
+                                                   seed=SEED, val_ratio=CV_VAL_RATIO)
     print(f"config={args.config}  device={device}", flush=True)
     print(f"split: train={len(train_ids)} val={len(val_ids)} test={len(test_ids)}", flush=True)
     print(f"settings: {cfg}", flush=True)
@@ -118,6 +131,15 @@ def main():
         "loss_curve": [], "val_curve": [],
     }
 
+    history["fold"] = args.fold
+    history["n_folds"] = args.n_folds if args.fold is not None else None
+    history["test_ids"] = test_ids
+    run = start_run(args.mlflow, experiment="brats2021",
+                    run_name=f"{args.config}{args.tag}")
+    run.log_params({"config": args.config, "fold": args.fold, **cfg,
+                    **history["hyperparameters"], "parameters": n_params,
+                    "n_train": len(train_ids), "n_val": len(val_ids)})
+
     ckpt = CHECKPOINT_DIR / f"{args.config}{args.tag}_best.pt"
     best = -1.0
     running = []
@@ -151,6 +173,7 @@ def main():
             mean_loss = float(np.mean(running[-50:]))
             elapsed = time.time() - t0
             history["loss_curve"].append({"iter": step, "loss": mean_loss})
+            run.log_metrics({"train_loss": mean_loss}, step=step)
             print(f"  iter {step}/{args.iters}  loss {mean_loss:.4f}  "
                   f"{step/elapsed:.2f} it/s  elapsed {elapsed/60:.1f}m", flush=True)
 
@@ -158,11 +181,14 @@ def main():
             val = quick_validate(model, val_ids, cfg["normalization"], device, args.val_patients)
             mean_dice = float(np.mean(list(val.values())))
             history["val_curve"].append({"iter": step, **val, "mean": mean_dice})
+            run.log_metrics({f"val_dice_{k}": v for k, v in val.items()} | {"val_dice_mean": mean_dice},
+                            step=step)
             flag = ""
             if mean_dice > best:
                 best = mean_dice
                 torch.save({"model": model.state_dict(), "config": args.config,
-                            "settings": cfg, "iter": step, "val_mean_dice": best},
+                            "settings": cfg, "iter": step, "val_mean_dice": best,
+                            "fold": args.fold, "seed": args.seed},
                            ckpt)
                 flag = "  <- best, saved"
             print(f"  VAL iter {step}  WT {val['WT']:.4f}  TC {val['TC']:.4f}  "
@@ -172,8 +198,12 @@ def main():
     history["best_val_mean_dice"] = best
     history["checkpoint"] = str(ckpt)
 
-    with open(LOG_DIR / f"{args.config}{args.tag}_history.json", "w") as f:
+    hist_path = LOG_DIR / f"{args.config}{args.tag}_history.json"
+    with open(hist_path, "w") as f:
         json.dump(history, f, indent=2)
+    run.log_metrics({"best_val_dice_mean": best, "train_minutes": history["train_minutes"]})
+    run.log_artifact(hist_path)
+    run.end()
 
     print(f"done in {history['train_minutes']:.1f} min, best mean val Dice {best:.4f}", flush=True)
     print(f"checkpoint: {ckpt}", flush=True)
