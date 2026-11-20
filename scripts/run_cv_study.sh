@@ -16,7 +16,7 @@ ITERS="${ITERS:-20000}"
 CONFIGS="${CONFIGS:-baseline_unet nnunet_style vnet segresnet swin_unetr}"
 FOLDS="${FOLDS:-0 1 2 3 4}"
 SEEDS="${SEEDS:-42 43 44}"
-EXTRA="${EXTRA:---mlflow}"
+EXTRA="${EXTRA---mlflow}"   # EXTRA="" disables MLflow
 
 for cfg in $CONFIGS; do
   for fold in $FOLDS; do

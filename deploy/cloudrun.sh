@@ -35,7 +35,7 @@ gcloud builds submit --project "$PROJECT" --config deploy/cloudbuild.yaml \
 
 gcloud run deploy "$SERVICE" --project "$PROJECT" --region "$REGION" --image "$IMAGE" \
   --no-allow-unauthenticated --memory 16Gi --cpu 4 --timeout 600 --concurrency 1 \
-  --max-instances 2 --min-instances 0 "${GPU_FLAGS[@]}"
+  --max-instances 2 --min-instances 0 ${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"}
 
 gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" \
   --format 'value(status.url)'
